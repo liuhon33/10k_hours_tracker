@@ -33,7 +33,6 @@ class StudyTracker(tk.Tk):
         self.session_seconds = 0
 
         self.setup_ui()
-        self.update_clock()
 
         self.update_display() 
         
