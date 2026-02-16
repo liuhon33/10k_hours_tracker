@@ -36,20 +36,20 @@ class StudyTracker(tk.Tk):
         self.update_clock()
 
     def pull_from_github(self):
-        try:
-            subprocess.run(["git", "pull", "origin", "main"], cwd=REPO_DIR, check=True, capture_output=True)
-            print("Successfully pulled latest data from GitHub.")
-        except subprocess.CalledProcessError as e:
-            print(f"Git pull failed: {e}")
+            try:
+                subprocess.run(["git", "pull", "origin", "master"], cwd=REPO_DIR, check=True, capture_output=True, text=True)
+                print("Successfully pulled latest data from GitHub.")
+            except subprocess.CalledProcessError as e:
+                print(f"Git pull failed. Reason:\n{e.stderr}")
 
     def sync_with_github(self):
         try:
-            subprocess.run(["git", "add", DATA_FILE], cwd=REPO_DIR, check=True, capture_output=True)
-            subprocess.run(["git", "commit", "-m", "Auto-update: Added study time/subject"], cwd=REPO_DIR, check=True, capture_output=True)
-            subprocess.run(["git", "push", "origin", "main"], cwd=REPO_DIR, check=True, capture_output=True)
+            subprocess.run(["git", "add", DATA_FILE], cwd=REPO_DIR, check=True, capture_output=True, text=True)
+            subprocess.run(["git", "commit", "-m", "Auto-update: Added study time/subject"], cwd=REPO_DIR, check=True, capture_output=True, text=True)
+            subprocess.run(["git", "push", "origin", "master"], cwd=REPO_DIR, check=True, capture_output=True, text=True)
             print("Successfully synced to GitHub.")
         except subprocess.CalledProcessError as e:
-            print(f"Git push failed: {e}")
+            print(f"Git push failed. Reason:\n{e.stderr}")
 
     def load_data(self):
         if not os.path.exists(DATA_FILE):
@@ -80,44 +80,44 @@ class StudyTracker(tk.Tk):
         self.sync_with_github()
 
     def setup_ui(self):
-        # Subject Selection Area
-        top_frame = ttk.Frame(self)
-        top_frame.pack(pady=(15, 5))
-        
-        ttk.Label(top_frame, text="Select Subject:", font=("Arial", 12)).grid(row=0, column=0, padx=5)
-        
-        self.dropdown = ttk.OptionMenu(top_frame, self.current_subject, self.current_subject.get(), *self.data.keys(), command=self.on_subject_change)
-        self.dropdown.grid(row=0, column=1, padx=5)
-        
-        self.add_sub_btn = ttk.Button(top_frame, text="+ New", width=6, command=self.add_new_subject)
-        self.add_sub_btn.grid(row=0, column=2, padx=5)
+            # Subject Selection Area
+            top_frame = ttk.Frame(self)
+            top_frame.pack(pady=(15, 5))
+            
+            ttk.Label(top_frame, text="Select Subject:", font=("Arial", 12)).grid(row=0, column=0, padx=5)
+            
+            # Swapped OptionMenu for Combobox
+            self.dropdown = ttk.Combobox(top_frame, textvariable=self.current_subject, values=list(self.data.keys()), state="readonly")
+            self.dropdown.grid(row=0, column=1, padx=5)
+            self.dropdown.bind("<<ComboboxSelected>>", self.on_subject_change)
+            
+            self.add_sub_btn = ttk.Button(top_frame, text="+ New", width=6, command=self.add_new_subject)
+            self.add_sub_btn.grid(row=0, column=2, padx=5)
 
-        # Time Display
-        self.time_label = ttk.Label(self, text="0.0000 Hours", font=("Arial", 26, "bold"))
-        self.time_label.pack(pady=15)
+            # Time Display
+            self.time_label = ttk.Label(self, text="0.0000 Hours", font=("Arial", 26, "bold"))
+            self.time_label.pack(pady=15)
 
-        # Timer Buttons
-        self.btn_frame = ttk.Frame(self)
-        self.btn_frame.pack(pady=5)
+            # Timer Buttons
+            self.btn_frame = ttk.Frame(self)
+            self.btn_frame.pack(pady=5)
 
-        self.start_btn = ttk.Button(self.btn_frame, text="Start", command=self.start_timer)
-        self.start_btn.grid(row=0, column=0, padx=5)
+            self.start_btn = ttk.Button(self.btn_frame, text="Start", command=self.start_timer)
+            self.start_btn.grid(row=0, column=0, padx=5)
 
-        self.stop_btn = ttk.Button(self.btn_frame, text="Stop", command=self.stop_timer, state=tk.DISABLED)
-        self.stop_btn.grid(row=0, column=1, padx=5)
+            self.stop_btn = ttk.Button(self.btn_frame, text="Stop", command=self.stop_timer, state=tk.DISABLED)
+            self.stop_btn.grid(row=0, column=1, padx=5)
 
-        # Utility Buttons
-        self.add_manual_btn = ttk.Button(self, text="Add Past Hours", command=self.add_manual_hours)
-        self.add_manual_btn.pack(pady=(20, 5))
-        
-        self.graph_btn = ttk.Button(self, text="Show Growth Graph", command=self.show_graph)
-        self.graph_btn.pack(pady=5)
+            # Utility Buttons
+            self.add_manual_btn = ttk.Button(self, text="Add Past Hours", command=self.add_manual_hours)
+            self.add_manual_btn.pack(pady=(20, 5))
+            
+            self.graph_btn = ttk.Button(self, text="Show Growth Graph", command=self.show_graph)
+            self.graph_btn.pack(pady=5)
 
     def refresh_dropdown(self):
-        menu = self.dropdown["menu"]
-        menu.delete(0, "end")
-        for subject in self.data.keys():
-            menu.add_command(label=subject, command=tk._setit(self.current_subject, subject, self.on_subject_change))
+        # Much cleaner Combobox update
+        self.dropdown['values'] = list(self.data.keys())
 
     def add_new_subject(self):
         new_subject = simpledialog.askstring("New Subject", "Enter the name of the new subject:")
