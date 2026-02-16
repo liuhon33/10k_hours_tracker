@@ -1,0 +1,36 @@
+{
+    "python": [
+        {
+            "timestamp": 1771222651.055341,
+            "total_seconds": 0
+        },
+        {
+            "timestamp": 1771222738.5113287,
+            "total_seconds": 3.1755659580230713
+        }
+    ],
+    "stats": [
+        {
+            "timestamp": 1771222651.055341,
+            "total_seconds": 0
+        }
+    ],
+    "bioinformatics": [
+        {
+            "timestamp": 1771222651.055341,
+            "total_seconds": 0
+        }
+    ],
+    "machine learning": [
+        {
+            "timestamp": 1771222651.055341,
+            "total_seconds": 0
+        }
+    ],
+    "linear algebra": [
+        {
+            "timestamp": 1771222651.055341,
+            "total_seconds": 0
+        }
+    ]
+}
