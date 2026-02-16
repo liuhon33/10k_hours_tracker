@@ -39,7 +39,14 @@ class StudyTracker(tk.Tk):
         
         self.update_clock()
 
+    def is_git_repo(self):
+        """Checks if the folder is configured for Git sync."""
+        return os.path.exists(os.path.join(REPO_DIR, ".git"))
+
     def pull_from_github(self):
+        if not self.is_git_repo():
+            return # Skip syncing if they are just a standard user
+            
         try:
             subprocess.run(["git", "pull", "origin", "master"], cwd=REPO_DIR, check=True, capture_output=True, text=True)
             print("Successfully pulled latest data from GitHub.")
@@ -47,6 +54,9 @@ class StudyTracker(tk.Tk):
             print(f"Git pull failed. Reason:\n{e.stderr}")
 
     def sync_with_github(self):
+        if not self.is_git_repo():
+            return # Skip syncing if they are just a standard user
+            
         try:
             subprocess.run(["git", "add", DATA_FILE], cwd=REPO_DIR, check=True, capture_output=True, text=True)
             subprocess.run(["git", "commit", "-m", "Auto-update: Added study time/subject"], cwd=REPO_DIR, check=True, capture_output=True, text=True)
