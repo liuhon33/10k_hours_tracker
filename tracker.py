@@ -18,7 +18,7 @@ class StudyTracker(tk.Tk):
         self.geometry("400x380")
         self.resizable(False, False)
 
-        self.default_subjects = ["python", "stats", "bioinformatics", "machine learning", "linear algebra"]
+        self.default_subjects = ["python", "stats", "bioinformatics", "machine learning",]
         
         self.pull_from_github()
         self.data = self.load_data()
@@ -35,12 +35,16 @@ class StudyTracker(tk.Tk):
         self.setup_ui()
         self.update_clock()
 
+        self.update_display() 
+        
+        self.update_clock()
+
     def pull_from_github(self):
-            try:
-                subprocess.run(["git", "pull", "origin", "master"], cwd=REPO_DIR, check=True, capture_output=True, text=True)
-                print("Successfully pulled latest data from GitHub.")
-            except subprocess.CalledProcessError as e:
-                print(f"Git pull failed. Reason:\n{e.stderr}")
+        try:
+            subprocess.run(["git", "pull", "origin", "master"], cwd=REPO_DIR, check=True, capture_output=True, text=True)
+            print("Successfully pulled latest data from GitHub.")
+        except subprocess.CalledProcessError as e:
+            print(f"Git pull failed. Reason:\n{e.stderr}")
 
     def sync_with_github(self):
         try:
