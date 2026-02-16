@@ -4,10 +4,10 @@ import json
 import time
 import os
 import subprocess
+from datetime import datetime
+import matplotlib.pyplot as plt
 
 # --- Configuration ---
-# Set this to the path of your local Git repository folder. 
-# "." means the folder where this script is currently located.
 REPO_DIR = "." 
 DATA_FILE = os.path.join(REPO_DIR, "10000_hours_data.json")
 
@@ -15,18 +15,19 @@ class StudyTracker(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("10,000 Hours Tracker")
-        self.geometry("380x300")
+        self.geometry("400x380")
         self.resizable(False, False)
 
         self.default_subjects = ["python", "stats", "bioinformatics", "machine learning", "linear algebra"]
         
-        # 1. Pull the latest data from GitHub first
         self.pull_from_github()
-        
-        # 2. Then load the data into the app
         self.data = self.load_data()
         
-        self.current_subject = tk.StringVar(value=self.default_subjects[0])
+        # Ensure at least one subject exists
+        if not self.data:
+            self.data = {sub: [{"timestamp": time.time(), "total_seconds": 0}] for sub in self.default_subjects}
+
+        self.current_subject = tk.StringVar(value=list(self.data.keys())[0])
         self.start_time = None
         self.is_running = False
         self.session_seconds = 0
@@ -35,46 +36,67 @@ class StudyTracker(tk.Tk):
         self.update_clock()
 
     def pull_from_github(self):
-        """Automatically pulls the latest data from GitHub on startup."""
         try:
-            # Pulls from the remote named 'origin' and branch 'main'
             subprocess.run(["git", "pull", "origin", "main"], cwd=REPO_DIR, check=True, capture_output=True)
             print("Successfully pulled latest data from GitHub.")
         except subprocess.CalledProcessError as e:
-            # Fails silently in the UI, but prints to console for debugging
-            print(f"Git pull failed (you might be offline or have local conflicts): {e}")
+            print(f"Git pull failed: {e}")
 
     def sync_with_github(self):
-        """Automatically commits and pushes changes to GitHub."""
         try:
             subprocess.run(["git", "add", DATA_FILE], cwd=REPO_DIR, check=True, capture_output=True)
-            commit_msg = "Auto-update: Added study time"
-            subprocess.run(["git", "commit", "-m", commit_msg], cwd=REPO_DIR, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "Auto-update: Added study time/subject"], cwd=REPO_DIR, check=True, capture_output=True)
             subprocess.run(["git", "push", "origin", "main"], cwd=REPO_DIR, check=True, capture_output=True)
             print("Successfully synced to GitHub.")
         except subprocess.CalledProcessError as e:
             print(f"Git push failed: {e}")
 
     def load_data(self):
-        if os.path.exists(DATA_FILE):
-            with open(DATA_FILE, "r") as f:
-                return json.load(f)
-        return {sub: 0 for sub in self.default_subjects}
+        if not os.path.exists(DATA_FILE):
+            return {}
+            
+        with open(DATA_FILE, "r") as f:
+            raw_data = json.load(f)
+            
+        # Data Migration: Convert old flat format to time-series format
+        migrated_data = {}
+        needs_save = False
+        for subject, value in raw_data.items():
+            if isinstance(value, (int, float)):
+                migrated_data[subject] = [{"timestamp": time.time(), "total_seconds": value}]
+                needs_save = True
+            else:
+                migrated_data[subject] = value
+                
+        if needs_save:
+            self.data = migrated_data
+            self.save_data()
+            
+        return migrated_data
 
     def save_data(self):
         with open(DATA_FILE, "w") as f:
             json.dump(self.data, f, indent=4)
-        # Push to GitHub immediately after saving locally
         self.sync_with_github()
 
     def setup_ui(self):
-        ttk.Label(self, text="Select Subject:", font=("Arial", 12)).pack(pady=(15, 5))
-        dropdown = ttk.OptionMenu(self, self.current_subject, self.current_subject.get(), *self.data.keys(), command=self.on_subject_change)
-        dropdown.pack()
+        # Subject Selection Area
+        top_frame = ttk.Frame(self)
+        top_frame.pack(pady=(15, 5))
+        
+        ttk.Label(top_frame, text="Select Subject:", font=("Arial", 12)).grid(row=0, column=0, padx=5)
+        
+        self.dropdown = ttk.OptionMenu(top_frame, self.current_subject, self.current_subject.get(), *self.data.keys(), command=self.on_subject_change)
+        self.dropdown.grid(row=0, column=1, padx=5)
+        
+        self.add_sub_btn = ttk.Button(top_frame, text="+ New", width=6, command=self.add_new_subject)
+        self.add_sub_btn.grid(row=0, column=2, padx=5)
 
+        # Time Display
         self.time_label = ttk.Label(self, text="0.0000 Hours", font=("Arial", 26, "bold"))
         self.time_label.pack(pady=15)
 
+        # Timer Buttons
         self.btn_frame = ttk.Frame(self)
         self.btn_frame.pack(pady=5)
 
@@ -84,8 +106,38 @@ class StudyTracker(tk.Tk):
         self.stop_btn = ttk.Button(self.btn_frame, text="Stop", command=self.stop_timer, state=tk.DISABLED)
         self.stop_btn.grid(row=0, column=1, padx=5)
 
+        # Utility Buttons
         self.add_manual_btn = ttk.Button(self, text="Add Past Hours", command=self.add_manual_hours)
-        self.add_manual_btn.pack(pady=15)
+        self.add_manual_btn.pack(pady=(20, 5))
+        
+        self.graph_btn = ttk.Button(self, text="Show Growth Graph", command=self.show_graph)
+        self.graph_btn.pack(pady=5)
+
+    def refresh_dropdown(self):
+        menu = self.dropdown["menu"]
+        menu.delete(0, "end")
+        for subject in self.data.keys():
+            menu.add_command(label=subject, command=tk._setit(self.current_subject, subject, self.on_subject_change))
+
+    def add_new_subject(self):
+        new_subject = simpledialog.askstring("New Subject", "Enter the name of the new subject:")
+        if new_subject:
+            new_subject = new_subject.strip()
+            if new_subject in self.data:
+                messagebox.showwarning("Duplicate", "This subject already exists.")
+                return
+            
+            # Initialize new subject with 0 hours
+            self.data[new_subject] = [{"timestamp": time.time(), "total_seconds": 0}]
+            self.save_data()
+            self.refresh_dropdown()
+            self.current_subject.set(new_subject)
+            self.update_display()
+
+    def get_current_total_seconds(self, subject):
+        if not self.data.get(subject):
+            return 0
+        return self.data[subject][-1]["total_seconds"]
 
     def on_subject_change(self, *args):
         if self.is_running:
@@ -98,6 +150,7 @@ class StudyTracker(tk.Tk):
         self.start_btn.config(state=tk.DISABLED)
         self.stop_btn.config(state=tk.NORMAL)
         self.add_manual_btn.config(state=tk.DISABLED)
+        self.add_sub_btn.config(state=tk.DISABLED)
 
     def stop_timer(self):
         if not self.is_running: return
@@ -106,13 +159,17 @@ class StudyTracker(tk.Tk):
         elapsed = time.time() - self.start_time
         
         subject = self.current_subject.get()
-        self.data[subject] += elapsed
+        new_total = self.get_current_total_seconds(subject) + elapsed
+        
+        # Append the new session to the history
+        self.data[subject].append({"timestamp": time.time(), "total_seconds": new_total})
         self.save_data() 
         
         self.session_seconds = 0
         self.start_btn.config(state=tk.NORMAL)
         self.stop_btn.config(state=tk.DISABLED)
         self.add_manual_btn.config(state=tk.NORMAL)
+        self.add_sub_btn.config(state=tk.NORMAL)
         self.update_display()
 
     def add_manual_hours(self):
@@ -125,12 +182,43 @@ class StudyTracker(tk.Tk):
                 if hours_to_add < 0:
                     raise ValueError
                 
-                self.data[subject] += (hours_to_add * 3600)
+                new_total = self.get_current_total_seconds(subject) + (hours_to_add * 3600)
+                self.data[subject].append({"timestamp": time.time(), "total_seconds": new_total})
                 self.save_data()
                 self.update_display()
                 messagebox.showinfo("Success", f"Added {hours_to_add} hours to {subject}.")
             except ValueError:
                 messagebox.showerror("Invalid Input", "Please enter a valid positive number.")
+
+    def show_graph(self):
+        plt.figure(figsize=(10, 6))
+        
+        has_data = False
+        for subject, history in self.data.items():
+            if not history or history[-1]["total_seconds"] == 0:
+                continue # Skip subjects with zero total hours
+                
+            has_data = True
+            # Extract timestamps and convert to datetime objects
+            dates = [datetime.fromtimestamp(entry["timestamp"]) for entry in history]
+            # Convert seconds to hours
+            hours = [entry["total_seconds"] / 3600 for entry in history]
+            
+            # Plot as a step-forward line so the graph stays flat between sessions
+            plt.step(dates, hours, where='post', marker='o', label=subject)
+
+        if not has_data:
+            messagebox.showinfo("No Data", "No study hours logged yet to graph.")
+            plt.close()
+            return
+
+        plt.title("10,000 Hours Journey")
+        plt.xlabel("Date")
+        plt.ylabel("Cumulative Hours")
+        plt.legend()
+        plt.grid(True, linestyle="--", alpha=0.7)
+        plt.tight_layout()
+        plt.show()
 
     def update_clock(self):
         if self.is_running:
@@ -140,7 +228,7 @@ class StudyTracker(tk.Tk):
 
     def update_display(self):
         subject = self.current_subject.get()
-        total_seconds = self.data.get(subject, 0) + self.session_seconds
+        total_seconds = self.get_current_total_seconds(subject) + self.session_seconds
         total_hours = total_seconds / 3600
         self.time_label.config(text=f"{total_hours:.4f} Hours")
 
