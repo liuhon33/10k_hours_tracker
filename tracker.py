@@ -80,40 +80,43 @@ class StudyTracker(tk.Tk):
         self.sync_with_github()
 
     def setup_ui(self):
-            # Subject Selection Area
-            top_frame = ttk.Frame(self)
-            top_frame.pack(pady=(15, 5))
-            
-            ttk.Label(top_frame, text="Select Subject:", font=("Arial", 12)).grid(row=0, column=0, padx=5)
-            
-            # Swapped OptionMenu for Combobox
-            self.dropdown = ttk.Combobox(top_frame, textvariable=self.current_subject, values=list(self.data.keys()), state="readonly")
-            self.dropdown.grid(row=0, column=1, padx=5)
-            self.dropdown.bind("<<ComboboxSelected>>", self.on_subject_change)
-            
-            self.add_sub_btn = ttk.Button(top_frame, text="+ New", width=6, command=self.add_new_subject)
-            self.add_sub_btn.grid(row=0, column=2, padx=5)
+        # Subject Selection Area
+        top_frame = ttk.Frame(self)
+        top_frame.pack(pady=(15, 5))
+        
+        ttk.Label(top_frame, text="Select Subject:", font=("Arial", 12)).grid(row=0, column=0, padx=5)
+        
+        self.dropdown = ttk.Combobox(top_frame, textvariable=self.current_subject, values=list(self.data.keys()), state="readonly", width=15)
+        self.dropdown.grid(row=0, column=1, padx=5)
+        self.dropdown.bind("<<ComboboxSelected>>", self.on_subject_change)
+        
+        self.add_sub_btn = ttk.Button(top_frame, text="+ New", width=6, command=self.add_new_subject)
+        self.add_sub_btn.grid(row=0, column=2, padx=2)
 
-            # Time Display
-            self.time_label = ttk.Label(self, text="0.0000 Hours", font=("Arial", 26, "bold"))
-            self.time_label.pack(pady=15)
+        # NEW: Delete Button
+        self.del_sub_btn = ttk.Button(top_frame, text="- Delete", width=8, command=self.delete_subject)
+        self.del_sub_btn.grid(row=0, column=3, padx=2)
 
-            # Timer Buttons
-            self.btn_frame = ttk.Frame(self)
-            self.btn_frame.pack(pady=5)
+        # Time Display
+        self.time_label = ttk.Label(self, text="0.0000 Hours", font=("Arial", 26, "bold"))
+        self.time_label.pack(pady=15)
 
-            self.start_btn = ttk.Button(self.btn_frame, text="Start", command=self.start_timer)
-            self.start_btn.grid(row=0, column=0, padx=5)
+        # Timer Buttons
+        self.btn_frame = ttk.Frame(self)
+        self.btn_frame.pack(pady=5)
 
-            self.stop_btn = ttk.Button(self.btn_frame, text="Stop", command=self.stop_timer, state=tk.DISABLED)
-            self.stop_btn.grid(row=0, column=1, padx=5)
+        self.start_btn = ttk.Button(self.btn_frame, text="Start", command=self.start_timer)
+        self.start_btn.grid(row=0, column=0, padx=5)
 
-            # Utility Buttons
-            self.add_manual_btn = ttk.Button(self, text="Add Past Hours", command=self.add_manual_hours)
-            self.add_manual_btn.pack(pady=(20, 5))
-            
-            self.graph_btn = ttk.Button(self, text="Show Growth Graph", command=self.show_graph)
-            self.graph_btn.pack(pady=5)
+        self.stop_btn = ttk.Button(self.btn_frame, text="Stop", command=self.stop_timer, state=tk.DISABLED)
+        self.stop_btn.grid(row=0, column=1, padx=5)
+
+        # Utility Buttons
+        self.add_manual_btn = ttk.Button(self, text="Add Past Hours", command=self.add_manual_hours)
+        self.add_manual_btn.pack(pady=(20, 5))
+        
+        self.graph_btn = ttk.Button(self, text="Show Growth Graph", command=self.show_graph)
+        self.graph_btn.pack(pady=5)
 
     def refresh_dropdown(self):
         # Much cleaner Combobox update
@@ -132,6 +135,37 @@ class StudyTracker(tk.Tk):
             self.save_data()
             self.refresh_dropdown()
             self.current_subject.set(new_subject)
+            self.update_display()
+    
+    def delete_subject(self):
+        subject_to_delete = self.current_subject.get()
+        
+        # Guardrail: Prevent deleting the last remaining subject
+        if len(self.data) <= 1:
+            messagebox.showwarning("Cannot Delete", "You must have at least one subject. Add a new one first before deleting this one.")
+            return
+
+        # Warning pop-up to prevent accidental deletion
+        confirm = messagebox.askyesno(
+            "Confirm Delete", 
+            f"Are you sure you want to permanently delete '{subject_to_delete}' and all its tracked hours?\n\nThis will sync to GitHub and cannot be easily undone."
+        )
+        
+        if confirm:
+            # Delete the data
+            del self.data[subject_to_delete]
+            
+            # Save to JSON and push to GitHub
+            self.save_data()
+            
+            # Refresh the dropdown list
+            self.refresh_dropdown()
+            
+            # Set the dropdown to whatever subject is currently first in the list
+            new_subject = list(self.data.keys())[0]
+            self.current_subject.set(new_subject)
+            
+            # Update the big timer display
             self.update_display()
 
     def get_current_total_seconds(self, subject):
